@@ -153,33 +153,13 @@ useLogin.onSuccess → localStorage.setItem('access_token', token) → navigate(
 3. **`login.spec.ts`** — 增加登录后页面内容断言
 4. **`full-user-journey.spec.ts`** — 新增完整用户流程 E2E 测试
 
-### 5.2 Code Changes
+### 5.2 Validation Plan
 
-**核心修复** (`useAuth.ts`):
+See: [`./20260426-001-validation-plan.md`](./20260426-001-validation-plan.md)
 
-```typescript
-// Base64URL → UTF-8 字符串解码
-function decodeBase64Url(str: string): string {
-  const base64 = str.replace(/-/g, '+').replace(/_/g, '/')
-  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
-  return atob(padded)
-}
+### 5.3 Workflow Change Proposal
 
-function parseJwt(token: string): TokenPayload | null {
-  try {
-    const parts = token.split('.')
-    if (parts.length !== 3) {
-      console.warn('[parseJwt] Invalid JWT structure: expected 3 parts, got', parts.length)
-      return null
-    }
-    const payload = JSON.parse(decodeBase64Url(parts[1]))
-    return payload as TokenPayload
-  } catch (err) {
-    console.warn('[parseJwt] Failed to decode JWT payload:', err)
-    return null
-  }
-}
-```
+See: [`./20260426-001-workflow-change-proposal.md`](./20260426-001-workflow-change-proposal.md)
 
 ---
 

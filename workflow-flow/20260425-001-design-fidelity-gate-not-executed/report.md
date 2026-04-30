@@ -156,11 +156,11 @@ test('login page matches prototype', async ({ page }) => {
 
 ### 5.2 Validation Plan
 
-See: [`./validation-plan.md`](./validation-plan.md)
+See: [`./20260425-001-validation-plan.md`](./20260425-001-validation-plan.md)
 
 ### 5.3 Workflow Change Proposal
 
-See: [`./workflow-change-proposal.md`](./workflow-change-proposal.md)
+See: [`./20260425-001-workflow-change-proposal.md`](./20260425-001-workflow-change-proposal.md)
 
 ---
 
