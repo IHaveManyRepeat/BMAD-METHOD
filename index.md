@@ -28,3 +28,4 @@ Auto-generated index of all bug analysis documents.
 
 - [20260425-001 Design Fidelity Gate 未真正执行](./workflow-flow/20260425-001-design-fidelity-gate-not-executed/report.md) — 2026-04-26
 - [20260506-004 API 详情页编辑/禁用按钮不生效 + 管理端全局按钮功能审计](./workflow-flow/20260506-004-api-detail-buttons-not-working/report.md) — 2026-05-06
+- [20260508-002 管理端页面代码放置位置错误](./workflow-flow/20260508-002-admin-code-wrong-location/report.md) — 2026-05-08 — **High**
