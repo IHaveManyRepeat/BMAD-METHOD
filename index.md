@@ -4,6 +4,8 @@ Auto-generated index of all bug analysis documents.
 
 ## api-contract
 
+- [20260512-001 schema-viewer-array](./api-contract/20260512-001-schema-viewer-array/report.md) — 2026-05-12
+
 - [20260512-001 20260512-001-api-update-500](./api-contract/20260512-001-20260512-001-api-update-500/report.md) — 2026-05-12
 
 - [20260426-001 JWT Base64URL 解析失败导致认证 401](./api-contract/20260426-001-jwt-base64url-parse-failure/report.md) — 2026-04-26
