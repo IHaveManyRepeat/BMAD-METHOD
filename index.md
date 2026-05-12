@@ -21,6 +21,8 @@ Auto-generated index of all bug analysis documents.
 
 ## ui-ux
 
+- [20260512-001 测试弹框和测试Tab的请求参数应自动填充模板](./ui-ux/20260512-001-测试弹框和测试tab的请求参数应自动填充模板/report.md) — 2026-05-12
+
 - [20260430-001 管理端内容区布局宽度被错误限制为 max-w-[1200px]](./ui-ux/20260430-001-layout-max-width-constraint/report.md) — 2026-04-30
 - [20260430-002 弹框蒙层(overlay)遮挡弹框内容(content)](./ui-ux/20260430-002-overlay-z-index-stacking/report.md) — 2026-04-30
 - [20260430-003 z-index token 命名空间错误导致 @theme 定义无效，弹框仍被蒙层遮挡](./ui-ux/20260430-003-z-index-token-namespace/report.md) — 2026-04-30
