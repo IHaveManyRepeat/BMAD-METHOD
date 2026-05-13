@@ -25,6 +25,8 @@ Auto-generated index of all bug analysis documents.
 
 ## ui-ux
 
+- [20260513-002 版本历史展示问题](./ui-ux/20260513-002-版本历史展示问题/report.md) — 2026-05-13
+
 - [20260513-001 version-history-display](./ui-ux/20260513-001-version-history-display/report.md) — 2026-05-13
 
 - [20260512-001 测试弹框和测试Tab的请求参数应自动填充模板](./ui-ux/20260512-001-测试弹框和测试tab的请求参数应自动填充模板/report.md) — 2026-05-12
