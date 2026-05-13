@@ -15,6 +15,8 @@ Auto-generated index of all bug analysis documents.
 
 ## missing-validation
 
+- [20260513-001 编辑接口后版本历史不记录](./missing-validation/20260513-001-version-history-missing/report.md) — 2026-05-13
+
 - [20260506-004 API 详情页编辑/禁用按钮不生效 + 管理端全局按钮功能审计](./missing-validation/20260506-004-api-detail-buttons-not-working/report.md) — 2026-05-06
 
 ## other
@@ -22,6 +24,8 @@ Auto-generated index of all bug analysis documents.
 - [20260429-001 数据库表字段缺少注释](./other/20260429-001-db-comments-missing/report.md) — 2026-04-29
 
 ## ui-ux
+
+- [20260513-001 version-history-display](./ui-ux/20260513-001-version-history-display/report.md) — 2026-05-13
 
 - [20260512-001 测试弹框和测试Tab的请求参数应自动填充模板](./ui-ux/20260512-001-测试弹框和测试tab的请求参数应自动填充模板/report.md) — 2026-05-12
 
