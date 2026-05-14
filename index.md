@@ -4,6 +4,8 @@ Auto-generated index of all bug analysis documents.
 
 ## api-contract
 
+- [20260514-001 user-credential-system-context](./api-contract/20260514-001-user-credential-system-context/report.md) — 2026-05-14
+
 - [20260512-001 schema-viewer-array](./api-contract/20260512-001-schema-viewer-array/report.md) — 2026-05-12
 
 - [20260512-001 20260512-001-api-update-500](./api-contract/20260512-001-20260512-001-api-update-500/report.md) — 2026-05-12
