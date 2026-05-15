@@ -6,6 +6,8 @@ Auto-generated index of all bug analysis documents.
 
 - [20260515-002 unregistered-skills-type-mismatch](./api-contract/20260515-002-unregistered-skills-type-mismatch/report.md) — 2026-05-15
 
+- [20260515-002 unregistered-skills-type-mismatch](./api-contract/20260515-002-unregistered-skills-type-mismatch/report.md) — 2026-05-15
+
 - [20260514-003 preferences-api-500](./api-contract/20260514-003-preferences-api-500/report.md) — 2026-05-14
 
 - [20260514-002 schema-fetch-fail](./api-contract/20260514-002-schema-fetch-fail/report.md) — 2026-05-14

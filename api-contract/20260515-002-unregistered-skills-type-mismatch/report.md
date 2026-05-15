@@ -7,8 +7,8 @@
 | 字段 | 值 |
 |-------|-------|
 | **ID** | 20260515-002 |
-| **标题** | UnregisteredSkillBanner 类型不匹配导致显示错误和崩溃 |
-| **类型** | TBD — 将在步骤 4 中选择 |
+| **标题** | UnregisteredSkillBanner API响应类型解析错误导致崩溃 |
+| **类型** | api-contract — 接口契约问题 |
 | **严重性** | 高 |
 | **状态** | open |
 | **分析时间** | 2026-05-15T13:45:00Z |
@@ -21,26 +21,25 @@
 
 ### 1.1 摘要
 
-UnregisteredSkillBanner 组件在加载 skills 列表页面时显示"发现个未注册 Skill"（具体数值缺失），并且当点击横幅展开详情时发生崩溃，控制台报错：`Uncaught TypeError: skills.map is not a function`，导致页面白屏。
+UnregisteredSkillBanner 组件在加载 skills 列表页面时显示"发现个未注册 Skill"（具体数值显示为2而不是正确数值），并且当点击横幅展开详情时发生崩溃，控制台报错：`Uncaught TypeError: skills.map is not a function`，导致页面白屏。
 
 ### 1.2 复现步骤
 
 1. 访问 `http://localhost:5174/skills`
-2. 页面加载时即显示黄色横幅"发现 undefined 个未注册 Skill"
+2. 页面加载时显示黄色横幅，显示不正确的数量
 3. 点击横幅展开详情
 4. 页面崩溃变白，控制台报错
 
 ### 1.3 预期行为
 
-1. 后端应返回正确的未注册技能数据或空数组
-2. 前端应正确解析并显示未注册技能的数量
-3. 没有未注册技能时不应显示横幅
-4. 点击横幅展开应显示技能列表，而不是崩溃
+1. 前端应正确解析后端返回的 API 响应结构
+2. 正确显示未注册技能的数量（`total` 字段）
+3. 点击横幅展开应显示技能列表，而不是崩溃
 
 ### 1.4 实际行为
 
-1. 横幅显示"发现 undefined 个未注册 Skill"（具体数值缺失）
-2. 用户找不到哪个接口请求这个数据
+1. 横幅显示不正确的数量
+2. 用户在浏览器开发者工具中可以看到 API 请求返回了正确的数据
 3. 点击横幅展开时页面崩溃变白
 4. 控制台报错：`Uncaught TypeError: skills.map is not a function`
 
@@ -54,9 +53,7 @@ UnregisteredSkillBanner 组件在加载 skills 列表页面时显示"发现个�
 admin-frontend/src/features/skills/components/UnregisteredSkillBanner.tsx
 admin-frontend/src/features/skills/hooks/useSkills.ts
 admin-frontend/src/features/skills/api/skillsApi.ts
-admin-backend/src/features/skill/routes.rs
-admin-backend/src/features/skill/service.rs
-admin-backend/src/features/skill/model.rs
+admin-frontend/src/shared/lib/apiClient.ts
 ```
 
 ### 2.2 调用图热点
@@ -64,14 +61,12 @@ admin-backend/src/features/skill/model.rs
 | 节点 | 连接数 | 复杂度 | 角色 |
 |------|-------------|------------|------|
 | admin-frontend/src/features/skills/hooks/useSkills.ts | 13 | 高 | 调用 API 并管理状态的 Hook |
-| admin-frontend/src/features/skills/components/SkillDetailPage.tsx | 29 | 非常高 | 具有多个依赖关系的主组件 |
-| admin-frontend/src/features/skills/components/SkillsListPage.tsx | 11 | 中等 | 使用 UnregisteredSkillBanner 的列表页面 |
 | admin-frontend/src/features/skills/components/UnregisteredSkillBanner.tsx | 6 | 中等 | 显示未注册技能的组件 |
 
 ### 2.3 依赖链
 
 ```
-SkillsListPage → UnregisteredSkillBanner → useUnregisteredSkills → skillsApi.getUnregistered → apiClient.get → GET /api/admin/skills/unregistered → get_unregistered_skills_handler → service::get_unregistered_skills
+SkillsListPage → UnregisteredSkillBanner → useUnregisteredSkills → skillsApi.getUnregistered → apiClient.get → GET /api/admin/skills/unregistered → 后端返回 UnregisteredSkillsResponse
 ```
 
 ### 2.4 可视化
@@ -80,18 +75,11 @@ SkillsListPage → UnregisteredSkillBanner → useUnregisteredSkills → skillsA
 
 ### 2.5 图表关键观察
 
-1. **18 个节点，126 条边** — skills 模块复杂度适中
-2. **未检测到热点或循环依赖** — 架构清晰
-3. **UnregisteredSkillBanner 直接导入 `../api/skillsApi`** 但未正确使用类型定义
-4. **前端和后端之间存在类型不匹配**：
+1. **数据流问题**：前端的 API 客户端接收到后端响应对象，但类型定义错误导致解析失败
+2. **类型不匹配**：
    - 后端返回：`UnregisteredSkillsResponse { skills: Vec<UnregisteredSkill>, total: usize }`
-   - 前端期望：直接从 API 获取 `UnregisteredSkill[]`
-   - 后端模型：`UnregisteredSkill { skill_id, description, file_path }`
-   - 前端接口：`UnregisteredSkill { id, name, description, source_path }`
-
----
-
-*步骤 2 添加了代码图分析。*
+   - 前端类型：`Promise<UnregisteredSkill[]>`（期望直接数组）
+   - 实际接收：整个 `UnregisteredSkillsResponse` 对象
 
 ---
 
@@ -99,86 +87,89 @@ SkillsListPage → UnregisteredSkillBanner → useUnregisteredSkills → skillsA
 
 ### 3.1 直接原因
 
-1. **后端 API 返回结构与前端期望不匹配**：
-   - 后端返回：`UnregisteredSkillsResponse { skills: Vec<UnregisteredSkill>, total: usize }`
-   - 前端代码：`skillsApi.getUnregistered()` 期望直接返回 `UnregisteredSkill[]`
-
-2. **前端 TypeScript 接口定义错误**：
+1. **前端 API 类型定义错误**：
    ```typescript
    // admin-frontend/src/features/skills/api/skillsApi.ts
    getUnregistered: async (): Promise<UnregisteredSkill[]> => {
      const response = await apiClient.get<UnregisteredSkill[]>('/skills/unregistered')
-     return response.data  // ❌ 错误：实际接收到的是 { skills, total }
+     return response.data  // ❌ 问题：response.data 实际是整个响应对象
    }
    ```
 
-3. **UnregisteredSkillBanner 组件直接使用错误的数据结构**：
+2. **apiClient 返回的是完整的 HTTP 响应体**：
+   - 后端返回 JSON：`{ "skills": [...], "total": 2 }`
+   - `apiClient.get()` 返回 `response.data` = `{ "skills": [...], "total": 2 }`
+   - 但由于泛型 `apiClient.get<UnregisteredSkill[]>()`，TypeScript 误认为 `response.data` 是 `UnregisteredSkill[]`
+
+3. **组件接收到错误的类型**：
    ```typescript
    // admin-frontend/src/features/skills/components/UnregisteredSkillBanner.tsx
-   const { data: unregisteredSkills, isLoading } = useUnregisteredSkills()
-   const skills = unregisteredSkills ?? []
-   const count = skills.length  // ❌ undefined.length 导致崩溃
+   const { data: unregisteredSkills } = useUnregisteredSkills()
+   // unregisteredSkills 的实际值：{ "skills": [...], "total": 2 }
+   // TypeScript 认为：UnregisteredSkill[]（错误）
+
+   const count = skills.length  // 2（对象属性个数，不是技能数量）
+   skills.map((s) => s.id)  // ❌ 崩溃：对象没有 .map 方法
    ```
 
 ### 3.2 根本原因
 
-1. **前后端接口契约未对齐**：
-   - 后端在实现 `get_unregistered_skills_handler` 时返回了包装对象 `UnregisteredSkillsResponse`
-   - 前端在定义 `getUnregistered` 接口时直接期望数组，没有检查后端实际返回结构
-   - 缺少统一接口文档（如 OpenAPI）来确保类型一致性
+1. **前端泛型参数误导**：
+   - `apiClient.get<T>(url)` 的泛型 `T` 用于类型检查，但不影响实际数据
+   - 开发者错误地使用 `<UnregisteredSkill[]>` 泛型，导致 TypeScript 以为响应是数组
+   - 实际上 `response.data` 始终是完整的 HTTP 响应体
 
-2. **字段名不匹配**：
-   - 后端模型使用 `skill_id`, `file_path`
-   - 前端接口使用 `id`, `source_path`
-   - 即使数据结构正确，字段名映射也会导致问题
+2. **缺少响应包装接口**：
+   - 前端没有为 `getUnregistered` API 定义正确的响应类型
+   - 应该定义 `UnregisteredSkillsResponse` 接口并使用它
 
-3. **缺少运行时数据验证**：
-   - 前端没有对接收到的数据进行类型检查
-   - 没有防御性编程来处理意外的数据结构
-   - 直接使用 `.map()` 等数组方法导致数据不是数组时崩溃
+3. **缺少运行时类型检查**：
+   - TypeScript 类型在编译时有效，但运行时数据可能不匹配
+   - 没有运行时验证确保接收到的数据结构符合预期
+
+4. **前端没有正确访问 `total` 字段**：
+   - 组件直接使用 `skills.length` 而不是 `total`
+   - 应该使用后端提供的 `total` 字段来显示数量
 
 ### 3.3 工作流层面原因
 
 **为什么工作流允许这个 bug 发生？**
 
-1. **缺少前后端接口验证步骤**：
-   - 开发流程中没有强制要求前后端接口类型一致性检查
-   - 缺少自动化接口契约测试
+1. **缺少 API 响应类型定义规范**：
+   - 开发流程中没有强制要求为每个 API 端点定义完整的响应类型
+   - 没有从后端自动生成前端类型定义的机制
 
-2. **API 设计规范不完善**：
-   - 没有统一的 API 响应格式规范
-   - 某些接口返回数组，某些返回包装对象，不一致
+2. **前后端接口契约未同步**：
+   - 后端已经实现了正确的响应结构 `UnregisteredSkillsResponse`
+   - 前端开发时没有参考后端实际的响应格式
+   - 缺少 OpenAPI 或类似规范文档
 
-3. **类型定义分散且未同步**：
-   - 后端类型定义在 Rust 结构体中
-   - 前端类型定义在 TypeScript 接口中
-   - 缺少从后端自动生成前端类型的机制
+3. **缺少类型安全检查**：
+   - 没有使用运行时数据验证（如 zod）
+   - 完全依赖 TypeScript 的编译时类型，不能捕获运行时数据结构不匹配
 
-4. **缺少集成测试**：
-   - 没有 E2E 测试覆盖未注册技能功能
-   - 导致这种明显的数据结构不匹配问题未在开发早期发现
+4. **测试覆盖不足**：
+   - 没有针对 API 响应结构的集成测试
+   - 没有针对 UnregisteredSkillBanner 组件的 E2E 测试
+   - 导致这种明显的数据解析问题未在开发早期发现
 
 ### 3.4 类似模式
 
 **是否存在类似的 bug 模式？**
 
-是的，这是典型的**前后端类型不一致**模式，可能出现在：
+是的，这是典型的**前端 API 泛型使用错误**模式，可能出现在：
 
 1. 其他 API 端点：
-   - 需要检查其他 skillsApi 方法是否也存在类似问题
-   - 特别是那些最近添加或修改的接口
+   - 需要检查 `skillsApi` 中的其他方法是否也存在类似问题
+   - 特别是那些返回包装对象而不是直接数组的接口
 
 2. 其他模块的 API：
-   - usersApi、apiApi 等模块可能也存在类型不匹配
-   - 建议进行全局接口契约审计
+   - `userApi`、`apiApi` 等模块可能也存在类型定义不匹配
+   - 建议进行全局 API 类型审计
 
-3. 批量导入接口：
-   - `importBatch` 接口的请求/响应格式也需要检查
-   - 后端期望 `skill_names: Vec<String>`，前端传递 `skill_ids: string[]`
-
----
-
-*根因分析在步骤 3 中添加。*
+3. axios/axios 实例使用：
+   - 所有使用 `apiClient.get<T>()` 的地方都需要检查泛型是否正确
+   - 泛型只用于类型检查，不应该影响实际数据处理
 
 ---
 
@@ -188,24 +179,27 @@ SkillsListPage → UnregisteredSkillBanner → useUnregisteredSkills → skillsA
 
 | 当前 | 改进后 |
 |---------|----------|
-| 后端开发 → 前端开发 → 手动类型同步 → 测试 | 后端开发 → 生成 OpenAPI 规范 → 前端从规范生成类型 → 自动验证 → 测试 |
+| 前端开发时手动定义 API 类型，可能出错 | 从后端自动生成前端 API 类型 |
+| 缺少 API 响应类型规范 | 使用 OpenAPI 规范确保前后端契约一致 |
+| 依赖 TypeScript 编译时类型，没有运行时验证 | 添加运行时数据验证机制（zod） |
+| 没有 API 响应结构测试 | 添加集成测试验证 API 响应格式 |
 
 **主要改进**：
-1. 引入 OpenAPI 规范流程，自动生成接口文档
-2. 从 OpenAPI 自动生成前端 TypeScript 类型
-3. 添加接口契约一致性检查步骤到开发流程
-4. 建立运行时数据验证机制
+1. 引入 OpenAPI 规范流程，从后端自动生成前端类型
+2. 添加运行时数据验证（zod）确保数据结构符合预期
+3. 建立 API 响应结构测试规范
+4. 制定 API 类型定义最佳实践指南
 
 ### 4.2 自动化验证
 
 **验证文档**: `./validation-plan.md`
 
 **验证机制列表**：
-1. **单元测试**：后端和前端单元测试覆盖 API 响应结构
-2. **集成测试**：API 契约测试确保前后端类型一致
+1. **单元测试**：前端 API 客户端测试，验证响应数据解析
+2. **集成测试**：API 响应结构测试，确保前后端类型一致
 3. **E2E 测试**：覆盖未注册技能的完整用户流程
-4. **静态分析**：TypeScript 编译检查和 Rust clippy lint
-5. **运行时检查**：使用 zod 进行前端数据验证
+4. **静态分析**：TypeScript 编译检查，确保类型安全
+5. **运行时检查**：使用 zod 进行数据验证，捕获类型不匹配
 
 ---
 
@@ -215,7 +209,7 @@ SkillsListPage → UnregisteredSkillBanner → useUnregisteredSkills → skillsA
 
 **决策**: `plan` — 修复单个接口定义
 
-**说明**：这是一个单个接口的类型不匹配问题，涉及后端响应格式和前端类型定义的修正，修改范围明确且风险低，适合直接修复。
+**说明**：这是一个前端 API 类型定义错误，需要修正 `skillsApi.ts` 中的 `getUnregistered` 方法的类型定义，并更新组件以正确访问响应数据。
 
 **相关文档**：
 - [验证计划](./validation-plan.md) — 详细的验证机制
@@ -224,75 +218,100 @@ SkillsListPage → UnregisteredSkillBanner → useUnregisteredSkills → skillsA
 
 ### 5.2 具体修复步骤
 
-#### 5.2.1 后端修复
-
-**文件**: `admin-backend/src/features/skill/routes.rs`
-
-使用 serde 别名来映射字段名，使后端模型与前端期望一致：
-
-```rust
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnregisteredSkill {
-    #[serde(rename = "id")]
-    pub skill_id: String,
-
-    #[serde(rename = "name")]
-    #[serde(default)]
-    pub description: String,
-
-    #[serde(rename = "source_path")]
-    pub file_path: String,
-}
-```
-
-#### 5.2.2 前端 API 修复
+#### 5.2.1 前端 API 修复（最关键）
 
 **文件**: `admin-frontend/src/features/skills/api/skillsApi.ts`
 
-更新接口定义以匹配后端响应结构：
+添加正确的响应类型接口，并修复 `getUnregistered` 方法：
 
 ```typescript
+// 添加响应类型接口
 export interface UnregisteredSkillsResponse {
   skills: UnregisteredSkill[]
   total: number
 }
 
 export const skillsApi = {
+  // 其他方法...
+
+  // ✅ 修复：返回正确的响应类型
   getUnregistered: async (): Promise<UnregisteredSkillsResponse> => {
-    const response = await apiClient.get<UnregisteredSkillsResponse>('/skills/unregistered')
-    return response.data  // ✅ 正确：返回完整的响应对象
+    const response = await apiClient.get('/skills/unregistered')
+    return response.data  // response.data 现在正确匹配 UnregisteredSkillsResponse
   },
-  // ...
+
+  // 其他方法...
 }
 ```
 
-#### 5.2.3 前端 Hook 更新
+**关键点**：
+- 移除错误的泛型 `<UnregisteredSkill[]>`
+- 让 axios 推断实际的响应类型
+- 添加 `UnregisteredSkillsResponse` 接口定义
 
-**文件**: `admin-frontend/src/features/skills/hooks/useSkills.ts`
-
-返回类型更新后保持不变，已正确返回 `UnregisteredSkillsResponse`。
-
-#### 5.2.4 前端组件修复
+#### 5.2.2 前端组件修复
 
 **文件**: `admin-frontend/src/features/skills/components/UnregisteredSkillBanner.tsx`
 
-正确解构响应对象：
+正确访问响应对象：
 
 ```typescript
-const { data: unregisteredSkills, isLoading } = useUnregisteredSkills()
-const skills = unregisteredSkills?.skills ?? []  // ✅ 从响应对象获取 skills
-const count = skills.length
-const total = unregisteredSkills?.total ?? 0
+export function UnregisteredSkillBanner({ onImportComplete }: UnregisteredSkillBannerProps) {
+  const [expanded, setExpanded] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // ✅ 修复：unregisteredSkills 现在是 UnregisteredSkillsResponse
+  const { data: unregisteredSkills, isLoading } = useUnregisteredSkills()
+
+  // ✅ 修复：从响应对象正确获取数据
+  const skills = unregisteredSkills?.skills ?? []
+  const count = unregisteredSkills?.total ?? 0
+
+  if (isLoading) {
+    return null
+  }
+
+  if (count === 0) {
+    return null
+  }
+
+  // ... 其他代码保持不变
+}
 ```
 
-#### 5.2.5 添加防御性编程
+#### 5.2.3 添加运行时数据验证（推荐）
 
-在组件中添加类型守卫，防止数据结构异常：
+**文件**: `admin-frontend/src/features/skills/api/skillsApi.ts`
+
+使用 zod 进行响应数据验证：
 
 ```typescript
-// 确保 skills 是数组
-const skillsArray = Array.isArray(skills) ? skills : []
-const safeCount = skillsArray.length
+import { z } from 'zod'
+
+export const UnregisteredSkillSchema = z.object({
+  skill_id: z.string(),
+  description: z.string(),
+  file_path: z.string(),
+})
+
+export const UnregisteredSkillsResponseSchema = z.object({
+  skills: z.array(UnregisteredSkillSchema),
+  total: z.number(),
+})
+
+export const skillsApi = {
+  // 其他方法...
+
+  getUnregistered: async (): Promise<UnregisteredSkillsResponse> => {
+    const response = await apiClient.get('/skills/unregistered')
+
+    // ✅ 添加运行时验证
+    const validated = UnregisteredSkillsResponseSchema.parse(response.data)
+    return validated
+  },
+
+  // 其他方法...
+}
 ```
 
 ---
@@ -301,35 +320,31 @@ const safeCount = skillsArray.length
 
 ### 6.1 单元测试
 
-- [ ] `admin-backend/src/features/skill/service.rs` — 测试返回结构包含 skills 和 total 字段
-- [ ] `admin-backend/src/features/skill/service.rs` — 测试没有未注册技能时返回空数组
-- [ ] `admin-frontend/src/features/skills/hooks/useSkills.test.ts` — 测试正确解析 { skills, total } 结构
-- [ ] `admin-frontend/src/features/skills/hooks/useSkills.test.ts` — 测试处理空数组情况
+- [ ] `admin-frontend/src/features/skills/api/skillsApi.test.ts` — 测试 getUnregistered 方法正确解析响应
+- [ ] `admin-frontend/src/features/skills/components/UnregisteredSkillBanner.test.tsx` — 测试组件正确显示技能数量
+- [ ] `admin-frontend/src/features/skills/components/UnregisteredSkillBanner.test.tsx` — 测试组件正确处理展开/折叠
 
 ### 6.2 集成测试
 
-- [ ] `admin-backend/tests/integration_tests.rs` — 测试 GET /api/admin/skills/unregistered 返回正确的 JSON 结构
-- [ ] `admin-frontend/src/features/skills/components/UnregisteredSkillBanner.test.tsx` — 测试显示正确的技能数量
-- [ ] `admin-frontend/src/features/skills/components/UnregisteredSkillBanner.test.tsx` — 测试没有未注册技能时不渲染
-- [ ] `admin-frontend/src/features/skills/components/UnregisteredSkillBanner.test.tsx` — 测试展开时显示技能列表
+- [ ] `admin-frontend/src/features/skills/api/skillsApi.test.ts` — 测试 API 响应结构解析
+- [ ] `admin-frontend/src/features/skills/components/UnregisteredSkillBanner.test.tsx` — 测试组件与真实 API 响应集成
 
 ### 6.3 E2E 测试
 
 - [ ] `admin-frontend/tests/e2e/unregistered-skills.spec.ts` — 验证横幅显示正确的数量
 - [ ] `admin-frontend/tests/e2e/unregistered-skills.spec.ts` — 验证点击横幅展开显示技能列表
-- [ ] `admin-frontend/tests/e2e/unregistered-skills.spec.ts` — 验证导入所有技能后横幅消失
+- [ ] `admin-frontend/tests/e2e/unregistered-skills.spec.ts` — 验证批量导入功能
 
 ### 6.4 静态分析
 
-- [ ] `tsc --noEmit` — TypeScript 类型检查
-- [ ] `cargo clippy -- -D warnings` — Rust lint 检查
-- [ ] 创建接口契约一致性检查脚本
+- [ ] `tsc --noEmit` — TypeScript 类型检查，确保类型安全
+- [ ] 检查所有 API 调用的泛型使用是否正确
 
 ### 6.5 运行时检查
 
 - [ ] 使用 zod 进行前端响应数据验证
-- [ ] 添加响应拦截器进行自动验证
-- [ ] 确保后端响应结构始终符合契约
+- [ ] 在 API 拦截器中添加统一的数据验证
+- [ ] 添加错误边界捕获运行时数据验证失败
 
 ---
 
