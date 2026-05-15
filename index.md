@@ -4,6 +4,10 @@ Auto-generated index of all bug analysis documents.
 
 ## api-contract
 
+- [20260515-002 unregistered-skills-type-mismatch](./api-contract/20260515-002-unregistered-skills-type-mismatch/report.md) — 2026-05-15
+
+- [20260514-003 preferences-api-500](./api-contract/20260514-003-preferences-api-500/report.md) — 2026-05-14
+
 - [20260514-002 schema-fetch-fail](./api-contract/20260514-002-schema-fetch-fail/report.md) — 2026-05-14
 
 - [20260514-001 user-credential-system-context](./api-contract/20260514-001-user-credential-system-context/report.md) — 2026-05-14
@@ -41,6 +45,8 @@ Auto-generated index of all bug analysis documents.
 - [20260506-003 全站按钮颜色硬编码导致颜色不搭配](./ui-ux/20260506-003-button-color-hardcoded-tokens/report.md) — 2026-05-06
 
 ## workflow-flow
+
+- [20260514-004 schema-fetch-architecture](./workflow-flow/20260514-004-schema-fetch-architecture/report.md) — 2026-05-14
 
 - [20260425-001 Design Fidelity Gate 未真正执行](./workflow-flow/20260425-001-design-fidelity-gate-not-executed/report.md) — 2026-04-26
 - [20260506-004 API 详情页编辑/禁用按钮不生效 + 管理端全局按钮功能审计](./workflow-flow/20260506-004-api-detail-buttons-not-working/report.md) — 2026-05-06
