@@ -46,6 +46,10 @@ Auto-generated index of all bug analysis documents.
 - [20260430-003 z-index token 命名空间错误导致 @theme 定义无效，弹框仍被蒙层遮挡](./ui-ux/20260430-003-z-index-token-namespace/report.md) — 2026-04-30
 - [20260506-003 全站按钮颜色硬编码导致颜色不搭配](./ui-ux/20260506-003-button-color-hardcoded-tokens/report.md) — 2026-05-06
 
+## performance
+
+- [20260523-001 点击齿轮触发 4 次 schema 请求](./performance/20260523-001-schema-quad-request/report.md) — 2026-05-23
+
 ## workflow-flow
 
 - [20260514-004 schema-fetch-architecture](./workflow-flow/20260514-004-schema-fetch-architecture/report.md) — 2026-05-14
