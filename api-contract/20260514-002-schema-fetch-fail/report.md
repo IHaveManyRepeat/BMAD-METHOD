@@ -1,3 +1,127 @@
+# Bug Analysis Report
+
+---
+
+## Metadata
+
+| Field | Value |
+|-------|-------|
+| **ID** | 20260514-002 |
+| **Title** | 页面没有调用接口去查找管理端设置的系统上下文字段 |
+| **Type** | integration |
+| **Severity** | High |
+| **Status** | open |
+| **Analyzed At** | 2026-05-14T15:05:00.000Z |
+| **Project** | diy-a2ui-v1.2 |
+| **Version** | 002 |
+
+---
+
+## 1. Bug Description
+
+### 1.1 Summary
+
+用户访问 `http://localhost:5173/` 页面时，偏好设置面板中的表单完全没有调用 `/api/preferences/schema` 接口，导致表单显示为空。
+
+**用户澄清**：不是"调用接口失败"，而是"根本没有发起调用"。
+
+### 1.2 Reproduction Steps
+
+1. 启动 backend 服务（`localhost:3000`）
+2. 启动 frontend 开发服务器（`localhost:5173`）
+3. 打开浏览器 DevTools → Network 面板
+4. 访问 `http://localhost:5173/`
+5. 点击"设置"按钮打开偏好设置面板
+6. 观察 Network 面板 — **没有** `/api/preferences/schema` 请求发出
+
+**预期行为**：打开设置面板时，自动调用 `GET /api/preferences/schema` 获取字段定义
+
+**实际行为**：Network 面板中没有任何相关请求
+
+### 1.3 Expected Behavior
+
+`PreferencesForm` 组件在 mount 时（`useEffect`）应发起并行请求：
+
+```typescript
+const [schemaResult, preferencesResult] = await Promise.allSettled([
+    getPreferenceSchema(),
+    getPreferences(),
+]);
+```
+
+### 1.4 Actual Behavior
+
+接口调用未发生。
+
+---
+
+## 2. Code Graph Analysis
+
+### 2.1 Call Chain
+
+```
+ChatSidebar.tsx
+  └─ <SettingsPanel />
+
+SettingsPanel.tsx (line 109, 147)
+  └─ <PreferencesForm category="credentials" />
+  └─ <PreferencesForm />
+
+PreferencesForm.tsx (TSX source)
+  └─ useEffect(() => { load(); }, [category])
+       └─ Promise.allSettled([getPreferenceSchema(), getPreferences()])
+
+preferencesApi.ts (TSX source)
+  └─ getPreferenceSchema()
+       └─ apiClient("/preferences/schema")
+
+backend preferences.ts
+  └─ GET /api/preferences/schema
+       └─ fetchSchemaFromAdmin() → admin API
+```
+
+### 2.2 Key Discovery — Stale Build Artifact
+
+检查 `PreferencesForm` 的 **编译产物**（`.js`）与 **源码**（`.tsx`）对比：
+
+| 差异 | TSX 源码 | 编译后 JS |
+|------|---------|----------|
+| `category` prop | `export function PreferencesForm({ onSaved, category }: PreferencesFormProps)` | `export function PreferencesForm({ onSaved })` — **category 丢失** |
+| `CREDENTIAL_FIELD_NAMES` | 存在，定义凭证字段白名单 | 编译产物中 **无此常量** |
+| `filterFieldsByCategory` | 存在，按 category 过滤字段 | 编译产物中 **无此函数** |
+
+**结论**：`PreferencesForm.js` 是 **旧版本编译产物**，不包含 `category` 相关的代码。Dev server 可能使用了过时构建。
+
+### 2.3 Files Involved
+
+| File | Role |
+|------|------|
+| `packages/frontend/src/chat/components/SettingsPanel.tsx` | 引用 `PreferencesForm`，传递 `category` prop |
+| `packages/frontend/src/chat/components/PreferencesForm.tsx` | 源码，包含 `useEffect` 加载逻辑 |
+| `packages/frontend/src/chat/components/PreferencesForm.js` | **编译产物（疑似过时）** |
+| `packages/frontend/src/chat/api/preferencesApi.ts` | API 调用封装 |
+| `packages/frontend/vite.config.ts` | Dev server 代理配置 |
+
+---
+
+## 3. Root Cause Analysis
+
+### 3.1 Immediate Cause
+
+`PreferencesForm` 的编译产物 `.js` 文件与 `.tsx` 源码不一致 — **编译产物缺少 `category` prop 和 `useEffect` 加载逻辑**。这导致 dev server 加载的是旧版组件，该版本可能没有自动发起 API 调用。
+
+### 3.2 Root Cause
+
+**构建产物与源码不同步**：`.tsx` 源码已更新（新增 `category` 支持、完整的 `useEffect` 加载），但 `.js` 编译产物未重新生成，或 dev server 缓存了旧版本。
+
+### 3.3 Workflow-Level Cause
+
+**为什么工作流允许这个 bug 发生？**
+
+1. **前端无增量构建验证** — TSX 修改后未强制重新编译
+2. **Dev server 缓存问题** — Vite 的 HMR 可能在某些情况下加载了过期的模块
+3. **没有监控构建产物时效性** — CI/CD 未检查 `.js` 与 `.tsx` 的 timestamp 一致性
+
 ---
 
 ## 4. Prevention Strategy
@@ -6,15 +130,13 @@
 
 | Current | Proposed |
 |---------|----------|
-| Backend `fetchSchemaFromAdmin()` 失败时返回 `ok:true, data:[]`，静默降级 | Backend 应返回明确的错误状态（503 或 `unreachable:true`），让前端知道连接失败 |
-| 前端 `PreferencesForm` 不消费 `warning` 字段 | 前端展示 `warning` 信息，让用户知道是连接问题而非真的无字段 |
-| 字段定义为空时用户无法判断"真的没有"还是"连接失败" | 增加连接状态指示器（ConnectionStatus 组件） |
+| Dev server 直接从 `.tsx` 源码 HMR | 添加构建产物 timestamp 检查，不一致时警告或强制重 build |
+| 前端 build 仅检查 tsc 错误 | 添加 `tsc --noEmit` 作为 pre-commit hook |
 
 ### 4.2 Automated Validation
 
-1. **集成测试**：验证 admin API 不可达时 backend 返回 503 或 `unreachable:true`
-2. **E2E 测试**：验证前端在 admin API 不可达时展示"无法连接管理端"提示
-3. **单元测试**：`preferences.ts` 错误处理分支必须覆盖网络超时、401、500 三种场景
+1. **E2E 测试**：验证打开设置面板后 Network 有 `/api/preferences/schema` 请求
+2. **构建检查**：比较 `.js` 与 `.tsx` timestamp，不一致时 CI 失败
 
 ---
 
@@ -22,81 +144,37 @@
 
 ### 5.1 Fix Path
 
-**Decision**: `story` — 涉及 backend 和 frontend 两侧的跨模块改动，需要修改 API 契约（新增 `unreachable` 字段或改 HTTP 状态码），影响范围 ≥ 2 文件
+**Decision**: `plan` — 重新构建前端，清理缓存即可解决，无需跨模块改动
 
-### 5.2 Bug Type
+### 5.2 Concrete Fix
 
-**Selected**: `api-contract` — 前后端 API 契约不完整，error handling 未同步
-
-### 5.3 Concrete Fix Plan
-
-**Story: 修复偏好设置管理端连接失败的静默降级问题**
-
-**Backend 改动**（`packages/backend/src/routes/preferences.ts`）：
-
-1. 修改 `GET /preferences/schema` 错误处理：
-   - 网络错误 / 5xx → HTTP 503，`{ ok: false, error: { code: "ADMIN_UNREACHABLE", message: "无法连接管理端" } }`
-   - 401/403 → HTTP 503，`{ ok: false, error: { code: "ADMIN_AUTH_FAILED", message: "管理端认证失败" } }`
-   - 仅在 cache 有效时返回缓存数据（即使 stale）
-
-2. 新增 `unreachable` 响应字段（可选方案B）：
-   ```typescript
-   return c.json({
-     ok: true,
-     data: cachedSchema ?? [],
-     warning: "无法连接管理端，暂无字段定义",
-     unreachable: true,  // 新增字段
-   });
+1. **清理 build 缓存，重新编译**：
+   ```bash
+   rm -rf packages/frontend/src/chat/components/*.js*.map
+   cd packages/frontend && npm run build
    ```
 
-**Frontend 改动**（`packages/frontend/src/chat/components/PreferencesForm.tsx`）：
+2. **重启 dev server** 确保加载最新模块
 
-1. `useEffect` 中检测 `schemaResult` 失败：
-   ```typescript
-   if (schemaResult.status === "rejected") {
-     setSyncWarning("无法连接管理端，请检查网络或联系管理员");
-     // 或直接显示连接失败状态
-   }
-   ```
-
-2. `getPreferenceSchema()` 返回类型扩展，支持解析 `warning` 字段
-
-**验证要求**：
-- [ ] `preferences.ts` 单元测试：网络超时场景 → HTTP 503
-- [ ] `preferences.ts` 单元测试：401 场景 → HTTP 503
-- [ ] `PreferencesForm.tsx` E2E：管理端不可达时显示错误提示而非空表单
-- [ ] 回归测试：正常情况下偏好表单仍正常显示
+3. **验证**：
+   - 打开 DevTools Network
+   - 打开设置面板
+   - 确认 `/api/preferences/schema` 请求发出
 
 ---
 
 ## 6. Automated Verification Mechanism
 
-### 6.1 Unit Tests
+### 6.1 E2E Tests
 
-- [ ] `preferences.test.ts` — `fetchSchemaFromAdmin` 超时 → 503
-- [ ] `preferences.test.ts` — `fetchSchemaFromAdmin` 401 → 503
-- [ ] `preferences.test.ts` — `fetchSchemaFromAdmin` 成功但空数组 → 200 + 空数组
+- [ ] 打开设置面板 → 确认 Network 出现 `/api/preferences/schema` 请求
+- [ ] 刷新页面 → 确认请求不重复发起（仅 panel 打开时一次）
 
-### 6.2 Integration Tests
+### 6.2 Build Verification
 
-- [ ] 启动 backend + mock admin API（返回 200 但空数组）→ `/api/preferences/schema` 返回 200
-- [ ] mock admin API down → `/api/preferences/schema` 返回 503
-
-### 6.3 E2E Tests
-
-- [ ] 打开设置面板 → admin API 正常 → 显示字段表单
-- [ ] 打开设置面板 → admin API 不可达 → 显示"无法连接管理端"提示
-
-### 6.4 Static Analysis
-
-- [ ] `PreferencesForm.tsx` 警告未使用 `syncWarning` 状态（ESLint）
-- [ ] `preferences.ts` 确认无 `unwrap()` / `expect()`
-
-### 6.5 Runtime Checks
-
-- [ ] Backend 启动时验证 `ADMIN_SERVICE_TOKEN` 非空否则 warn 日志
+- [ ] `npm run build` 无错误
+- [ ] `.js` 文件 timestamp > 对应 `.tsx` 文件
 
 ---
 
-*Prevention Strategy, Fix Proposal, and Verification Mechanism added in Step 4.*
-**✅ Bug Analysis Report is now complete and can be used for coding!*
+*Bug Analysis Report updated with corrected root cause.*

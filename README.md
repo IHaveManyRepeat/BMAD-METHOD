@@ -47,13 +47,13 @@ bug-analysis-registry/
 
 | 类型 | 数量 |
 |------|------|
-| workflow-flow | 1 |
-| missing-validation | 0 |
-| state-management | 0 |
-| api-contract | 0 |
-| performance | 0 |
+| workflow-flow | 5 |
+| missing-validation | 5 |
+| state-management | 2 |
+| api-contract | 13 |
+| performance | 1 |
 | security | 0 |
-| ui-ux | 0 |
-| integration | 0 |
-| other | 0 |
-| **总计** | **1** |
+| ui-ux | 14 |
+| integration | 4 |
+| other | 1 |
+| **总计** | **45** |
