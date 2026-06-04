@@ -35,8 +35,6 @@ Auto-generated index of all bug analysis documents.
 
 ## other
 
-- [20260604-001 test-archive-verification](./other/20260604-001-test-archive-verification/report.md) — 2026-06-04
-
 - [20260429-001 数据库表字段缺少注释](./other/20260429-001-db-comments-missing/report.md) — 2026-04-29
 
 ## performance
